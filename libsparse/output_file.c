@@ -46,6 +46,15 @@
 #define off64_t off_t
 #endif
 
+#ifdef __BIONIC__
+extern void*  __mmap2(void *, size_t, int, int, int, off_t);
+static inline void *mmap64(void *addr, size_t length, int prot, int flags,
+        int fd, off64_t offset)
+{
+    return __mmap2(addr, length, prot, flags, fd, offset >> 12);
+}
+#endif
+
 #define min(a, b) \
 	({ typeof(a) _a = (a); typeof(b) _b = (b); (_a < _b) ? _a : _b; })
 
@@ -665,9 +674,6 @@ struct output_file *output_file_open_fd(int fd, unsigned int block_size, int64_t
 		out = output_file_new_gz();
 	} else {
 		out = output_file_new_normal();
-	}
-	if (!out) {
-		return NULL;
 	}
 
 	out->ops->open(out, fd);

@@ -106,6 +106,11 @@ include $(BUILD_HOST_STATIC_LIBRARY)
 # Shared and static library for target
 # ========================================================
 
+# This is needed in LOCAL_C_INCLUDES to access the C library's private
+# header named <bionic_time.h>
+#
+libcutils_c_includes := bionic/libc/private
+
 include $(CLEAR_VARS)
 LOCAL_MODULE := libcutils
 LOCAL_SRC_FILES := $(commonSources) \
@@ -120,19 +125,23 @@ LOCAL_SRC_FILES := $(commonSources) \
         uevent.c
 
 ifeq ($(TARGET_ARCH),arm)
-    LOCAL_SRC_FILES += arch-arm/memset32.S
+LOCAL_SRC_FILES += arch-arm/memset32.S
 else  # !arm
-    ifeq ($(TARGET_ARCH),x86)
-        LOCAL_CFLAGS += -DHAVE_MEMSET16 -DHAVE_MEMSET32
-        LOCAL_SRC_FILES += arch-x86/android_memset16.S arch-x86/android_memset32.S memory.c
-    else # !x86
-        ifeq ($(TARGET_ARCH),mips)
-            LOCAL_SRC_FILES += arch-mips/android_memset.c
-        else # !mips
-            LOCAL_SRC_FILES += memory.c
-        endif # !mips
-    endif # !x86
+ifeq ($(TARGET_ARCH_VARIANT),x86-atom)
+LOCAL_CFLAGS += -DHAVE_MEMSET16 -DHAVE_MEMSET32
+LOCAL_SRC_FILES += arch-x86/android_memset16.S arch-x86/android_memset32.S memory.c
+else # !x86-atom
+LOCAL_SRC_FILES += memory.c
+endif # !x86-atom
 endif # !arm
+
+ifneq ($(TARGET_RECOVERY_PRE_COMMAND),)
+    LOCAL_CFLAGS += -DRECOVERY_PRE_COMMAND='$(TARGET_RECOVERY_PRE_COMMAND)'
+endif
+
+ifeq ($(TARGET_RECOVERY_PRE_COMMAND_CLEAR_REASON),true)
+    LOCAL_CFLAGS += -DRECOVERY_PRE_COMMAND_CLEAR_REASON
+endif
 
 LOCAL_C_INCLUDES := $(libcutils_c_includes) $(KERNEL_HEADERS)
 LOCAL_STATIC_LIBRARIES := liblog

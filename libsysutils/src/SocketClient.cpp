@@ -112,12 +112,6 @@ char *SocketClient::quoteArg(const char *arg) {
     char *result = (char *)malloc(len * 2 + 3);
     char *current = result;
     const char *end = arg + len;
-    char *oldresult;
-
-    if(result == NULL) {
-        SLOGW("malloc error (%s)", strerror(errno));
-        return NULL;
-    }
 
     *(current++) = '"';
     while (arg < end) {
@@ -131,9 +125,8 @@ char *SocketClient::quoteArg(const char *arg) {
     }
     *(current++) = '"';
     *(current++) = '\0';
-    oldresult = result; // save pointer in case realloc fails
     result = (char *)realloc(result, current-result);
-    return result ? result : oldresult;
+    return result;
 }
 
 

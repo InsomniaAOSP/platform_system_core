@@ -73,6 +73,8 @@
 #define AID_LOOP_RADIO    1030  /* loop radio devices */
 #define AID_MEDIA_DRM     1031  /* MediaDrm plugins */
 
+#define AID_THEMEMAN      1300  /* theme manager */
+
 #define AID_SHELL         2000  /* adb and debug shell user */
 #define AID_CACHE         2001  /* cache access */
 #define AID_DIAG          2002  /* access to diagnostic resources */
@@ -87,6 +89,8 @@
 #define AID_NET_BW_STATS  3006  /* read bandwidth statistics */
 #define AID_NET_BW_ACCT   3007  /* change bandwidth statistics accounting */
 #define AID_NET_BT_STACK  3008  /* bluetooth: access config files */
+#define AID_QCOM_ONCRPC   3009  /* can read/write /dev/oncrpc files */
+#define AID_QCOM_DIAG     3010  /* can read/write /dev/diag */
 
 #define AID_MISC          9998  /* access to misc storage */
 #define AID_NOBODY        9999
@@ -148,10 +152,13 @@ static const struct android_id_info android_ids[] = {
     { "net_bw_stats", AID_NET_BW_STATS, },
     { "net_bw_acct", AID_NET_BW_ACCT, },
     { "loop_radio", AID_LOOP_RADIO, },
+    { "qcom_oncrpc", AID_QCOM_ONCRPC, },
+    { "qcom_diag", AID_QCOM_DIAG, },
     { "misc",      AID_MISC, },
     { "nobody",    AID_NOBODY, },
     { "clat",      AID_CLAT, },
     { "mediadrm",  AID_MEDIA_DRM, },
+    { "theme_man", AID_THEMEMAN, },
 };
 
 #define android_id_count \
@@ -188,9 +195,11 @@ static const struct fs_path_config android_dirs[] = {
     { 00755, AID_ROOT,   AID_SHELL,  0, "system/bin" },
     { 00755, AID_ROOT,   AID_SHELL,  0, "system/vendor" },
     { 00755, AID_ROOT,   AID_SHELL,  0, "system/xbin" },
+    { 00755, AID_ROOT,   AID_SHELL,  0, "system/etc/init.d" },
     { 00755, AID_ROOT,   AID_ROOT,   0, "system/etc/ppp" },
     { 00755, AID_ROOT,   AID_SHELL,  0, "vendor" },
     { 00777, AID_ROOT,   AID_ROOT,   0, "sdcard" },
+    { 00771, AID_SYSTEM, AID_SYSTEM, 0, "sd-ext" },
     { 00755, AID_ROOT,   AID_ROOT,   0, 0 },
 };
 
@@ -206,6 +215,7 @@ static const struct fs_path_config android_files[] = {
     { 00440, AID_ROOT,      AID_SHELL,     0, "system/etc/init.trout.rc" },
     { 00550, AID_ROOT,      AID_SHELL,     0, "system/etc/init.ril" },
     { 00550, AID_ROOT,      AID_SHELL,     0, "system/etc/init.testmenu" },
+    { 00750, AID_ROOT,      AID_SHELL,     0, "system/etc/init.d/*" },
     { 00550, AID_DHCP,      AID_SHELL,     0, "system/etc/dhcpcd/dhcpcd-run-hooks" },
     { 00444, AID_RADIO,     AID_AUDIO,     0, "system/etc/AudioPara4.csv" },
     { 00555, AID_ROOT,      AID_ROOT,      0, "system/etc/ppp/*" },
@@ -232,6 +242,7 @@ static const struct fs_path_config android_files[] = {
     /* the following file has enhanced capabilities and IS included in user builds. */
     { 00750, AID_ROOT,      AID_SHELL,     (1 << CAP_SETUID) | (1 << CAP_SETGID), "system/bin/run-as" },
 
+    { 06750, AID_ROOT,      AID_SYSTEM,    0, "system/bin/rebootcmd" },
     { 00755, AID_ROOT,      AID_SHELL,     0, "system/bin/*" },
     { 00755, AID_ROOT,      AID_ROOT,      0, "system/lib/valgrind/*" },
     { 00755, AID_ROOT,      AID_SHELL,     0, "system/xbin/*" },
