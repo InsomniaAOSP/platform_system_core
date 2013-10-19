@@ -83,17 +83,23 @@ unsigned int decode_uid(const char *s)
  * daemon. We communicate the file descriptor's value via the environment
  * variable ANDROID_SOCKET_ENV_PREFIX<name> ("ANDROID_SOCKET_foo").
  */
-int create_socket(const char *name, int type, mode_t perm, uid_t uid, gid_t gid)
+int create_socket(const char *name, int type, mode_t perm, uid_t uid, gid_t gid, const char *socketcon)
 {
     struct sockaddr_un addr;
     int fd, ret;
-    char *secon;
+    char *filecon;
+
+    if (socketcon)
+        setsockcreatecon(socketcon);
 
     fd = socket(PF_UNIX, type, 0);
     if (fd < 0) {
         ERROR("Failed to open socket '%s': %s\n", name, strerror(errno));
         return -1;
     }
+
+    if (socketcon)
+        setsockcreatecon(NULL);
 
     memset(&addr, 0 , sizeof(addr));
     addr.sun_family = AF_UNIX;
@@ -106,11 +112,11 @@ int create_socket(const char *name, int type, mode_t perm, uid_t uid, gid_t gid)
         goto out_close;
     }
 
-    secon = NULL;
+    filecon = NULL;
     if (sehandle) {
-        ret = selabel_lookup(sehandle, &secon, addr.sun_path, S_IFSOCK);
+        ret = selabel_lookup(sehandle, &filecon, addr.sun_path, S_IFSOCK);
         if (ret == 0)
-            setfscreatecon(secon);
+            setfscreatecon(filecon);
     }
 
     ret = bind(fd, (struct sockaddr *) &addr, sizeof (addr));
@@ -120,7 +126,7 @@ int create_socket(const char *name, int type, mode_t perm, uid_t uid, gid_t gid)
     }
 
     setfscreatecon(NULL);
-    freecon(secon);
+    freecon(filecon);
 
     chown(addr.sun_path, uid, gid);
     chmod(addr.sun_path, perm);
@@ -384,18 +390,28 @@ void open_devnull_stdio(void)
 
 void get_hardware_name(char *hardware, unsigned int *revision)
 {
-    char data[1024];
-    int fd, n;
+    char *data = 0;
+    size_t len = 0, limit;
+    int fd = -1, n;
+
     char *x, *hw, *rev;
 
     fd = open("/proc/cpuinfo", O_RDONLY);
     if (fd < 0) return;
 
-    n = read(fd, data, 1023);
-    close(fd);
-    if (n < 0) return;
+    do {
+        limit = len ? len * 2 : 1024;
+        x = realloc(data, limit);
+        if (!x) goto done;
+        data = x;
 
-    data[n] = 0;
+        n = read(fd, data + len, limit - len);
+        if (n < 0) goto done;
+        len += n;
+    }
+    while (len == limit);
+
+    data[len] = 0;
     hw = strstr(data, "\nHardware");
     rev = strstr(data, "\nRevision");
 
@@ -423,6 +439,11 @@ void get_hardware_name(char *hardware, unsigned int *revision)
             *revision = strtoul(x + 2, 0, 16);
         }
     }
+
+done:
+    if (fd >= 0)
+        close(fd);
+    free(data);
 }
 
 void import_kernel_cmdline(int in_qemu,

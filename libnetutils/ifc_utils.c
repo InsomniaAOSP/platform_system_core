@@ -487,7 +487,7 @@ int ifc_get_info(const char *name, in_addr_t *addr, int *prefixLength, unsigned 
         if(ioctl(ifc_ctl_sock, SIOCGIFNETMASK, &ifr) < 0) {
             *prefixLength = 0;
         } else {
-            *prefixLength = ipv4NetmaskToPrefixLength(
+            *prefixLength = ipv4NetmaskToPrefixLength((int)
                     ((struct sockaddr_in*) &ifr.ifr_addr)->sin_addr.s_addr);
         }
     }
@@ -988,4 +988,20 @@ int ifc_get_mtu(const char *name, int *mtuSz)
     }
 
     return -1;
+}
+
+// Required for Broadcom RILD
+int ifc_set_mtu(const char *name, int mtuSz)
+{
+    struct ifreq ifr;
+    int ret;
+    ifc_init_ifr(name, &ifr);
+    ifr.ifr_mtu = mtuSz;
+
+    ret = ioctl(ifc_ctl_sock, SIOCSIFMTU, &ifr);
+    if (ret < 0) {
+        printerr("ifc_set_mtu: SIOCSIFMTU failed: %d\n", ret);
+    }
+
+    return ret;
 }

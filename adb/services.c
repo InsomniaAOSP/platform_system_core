@@ -111,6 +111,8 @@ void restart_root_service(int fd, void *cookie)
 {
     char buf[100];
     char value[PROPERTY_VALUE_MAX];
+    char build_type[PROPERTY_VALUE_MAX];
+    char cm_version[PROPERTY_VALUE_MAX];
 
     if (getuid() == 0) {
         snprintf(buf, sizeof(buf), "adbd is already running as root\n");
@@ -120,6 +122,17 @@ void restart_root_service(int fd, void *cookie)
         property_get("ro.debuggable", value, "");
         if (strcmp(value, "1") != 0) {
             snprintf(buf, sizeof(buf), "adbd cannot run as root in production builds\n");
+            writex(fd, buf, strlen(buf));
+            adb_close(fd);
+            return;
+        }
+
+        property_get("persist.sys.root_access", value, "1");
+        property_get("ro.build.type", build_type, "");
+        property_get("ro.cm.version", cm_version, "");
+
+        if (strlen(cm_version) > 0 && strcmp(build_type, "eng") != 0 && (atoi(value) & 2) != 2) {
+            snprintf(buf, sizeof(buf), "root access is disabled by system setting - enable in settings -> development options\n");
             writex(fd, buf, strlen(buf));
             adb_close(fd);
             return;
@@ -556,6 +569,15 @@ asocket*  host_service_to_socket(const char*  name, const char *serial)
         } else if (!strncmp(name, "any", strlen("any"))) {
             sinfo->transport = kTransportAny;
             sinfo->state = CS_DEVICE;
+        } else if (!strncmp(name, "sideload", strlen("sideload"))) {
+            sinfo->transport = kTransportAny;
+            sinfo->state = CS_SIDELOAD;
+        } else if (!strncmp(name, "recovery", strlen("recovery"))) {
+            sinfo->transport = kTransportAny;
+            sinfo->state = CS_RECOVERY;
+        } else if (!strncmp(name, "online", strlen("online"))) {
+            sinfo->transport = kTransportAny;
+            sinfo->state = CS_ONLINE;
         } else {
             free(sinfo);
             return NULL;

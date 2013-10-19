@@ -33,6 +33,7 @@
 #include <selinux/selinux.h>
 #include <selinux/label.h>
 #include <selinux/android.h>
+#include <selinux/avc.h>
 
 #include <private/android_filesystem_config.h>
 #include <sys/time.h>
@@ -148,6 +149,7 @@ void fixup_sys_perms(const char *upath)
         INFO("fixup %s %d %d 0%o\n", buf, dp->uid, dp->gid, dp->perm);
         chown(buf, dp->uid, dp->gid);
         chmod(buf, dp->perm);
+        restorecon(buf);
     }
 }
 
@@ -355,6 +357,41 @@ static void parse_event(const char *msg, struct uevent *uevent)
     log_event_print("event { '%s', '%s', '%s', '%s', %d, %d }\n",
                     uevent->action, uevent->path, uevent->subsystem,
                     uevent->firmware, uevent->major, uevent->minor);
+}
+
+static char **get_v4l_device_symlinks(struct uevent *uevent)
+{
+    char **links;
+    int fd = -1;
+    int nr;
+    char link_name_path[256];
+    char link_name[64];
+
+    if (strncmp(uevent->path, "/devices/virtual/video4linux/video", 34))
+        return NULL;
+
+    links = malloc(sizeof(char *) * 2);
+    if (!links)
+        return NULL;
+    memset(links, 0, sizeof(char *) * 2);
+
+    snprintf(link_name_path, sizeof(link_name_path), "%s%s%s",
+            SYSFS_PREFIX, uevent->path, "/link_name");
+    fd = open(link_name_path, O_RDONLY);
+    if (fd < 0)
+        goto err;
+    nr = read(fd, link_name, sizeof(link_name) - 1);
+    close(fd);
+    if (nr <= 0)
+        goto err;
+    link_name[nr] = '\0';
+    if (asprintf(&links[0], "/dev/video/%s", link_name) <= 0)
+        links[0] = NULL;
+
+    return links;
+err:
+    free(links);
+    return NULL;
 }
 
 static char **get_character_device_symlinks(struct uevent *uevent)
@@ -627,6 +664,8 @@ static void handle_generic_device_event(struct uevent *uevent)
      } else
          base = "/dev/";
      links = get_character_device_symlinks(uevent);
+     if (!links)
+         links = get_v4l_device_symlinks(uevent);
 
      if (!devpath[0])
          snprintf(devpath, sizeof(devpath), "%s%s", base, name);
@@ -819,6 +858,15 @@ void handle_device_fd()
         struct uevent uevent;
         parse_event(msg, &uevent);
 
+        if (sehandle && selinux_status_updated() > 0) {
+            struct selabel_handle *sehandle2;
+            sehandle2 = selinux_android_file_context_handle();
+            if (sehandle2) {
+                selabel_close(sehandle);
+                sehandle = sehandle2;
+            }
+        }
+
         handle_device_event(&uevent);
         handle_firmware_event(&uevent);
     }
@@ -885,6 +933,7 @@ void device_init(void)
     sehandle = NULL;
     if (is_selinux_enabled() > 0) {
         sehandle = selinux_android_file_context_handle();
+        selinux_status_open(true);
     }
 
     /* is 256K enough? udev uses 16MB! */

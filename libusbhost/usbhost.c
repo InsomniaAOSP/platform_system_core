@@ -231,17 +231,13 @@ int usb_host_read_event(struct usb_host_context *context)
         while (offset < ret) {
             event = (struct inotify_event*)&event_buf[offset];
             done = 0;
-            wd = event->wd;
             if (wd == context->wdd) {
-                if ((event->mask & IN_CREATE) && !strcmp(event->name, "bus")) {
                     watch_existing_subdirs(context, context->wds, MAX_USBFS_WD_COUNT);
                     done = find_existing_devices(context->cb_added, context->data);
-                } else if ((event->mask & IN_DELETE) && !strcmp(event->name, "bus")) {
                     for (i = 0; i < MAX_USBFS_WD_COUNT; i++) {
                         if (context->wds[i] >= 0) {
                             inotify_rm_watch(context->fd, context->wds[i]);
                             context->wds[i] = -1;
-                        }
                     }
                 }
             } else if (wd == context->wds[0]) {

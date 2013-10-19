@@ -58,6 +58,7 @@ TOOLS := \
 	du \
 	md5 \
 	clear \
+	restart \
 	getenforce \
 	setenforce \
 	chcon \
@@ -70,6 +71,8 @@ TOOLS := \
 ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
 TOOLS += r
 endif
+
+TOOLS += setfattr
 
 ALL_TOOLS = $(TOOLS)
 ALL_TOOLS += \
@@ -90,6 +93,7 @@ ifeq ($(BOARD_USES_BOOTMENU),true)
 else
 	LOCAL_SRC_FILES += reboot.c
 endif
+
 
 LOCAL_C_INCLUDES := bionic/libc/bionic
 

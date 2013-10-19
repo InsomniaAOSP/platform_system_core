@@ -72,6 +72,7 @@
 #define AID_CLAT          1029  /* clat part of nat464 */
 #define AID_LOOP_RADIO    1030  /* loop radio devices */
 #define AID_MEDIA_DRM     1031  /* MediaDrm plugins */
+#define AID_AUDIT         1032  /* audit daemon */
 
 #define AID_THEMEMAN      1300  /* theme manager */
 
@@ -91,6 +92,22 @@
 #define AID_NET_BT_STACK  3008  /* bluetooth: access config files */
 #define AID_QCOM_ONCRPC   3009  /* can read/write /dev/oncrpc files */
 #define AID_QCOM_DIAG     3010  /* can read/write /dev/diag */
+
+#if defined(MOTOROLA_UIDS)
+#define AID_MOT_OSH       5000  /* OSH */
+#define AID_MOT_ACCY      9000  /* access to accessory */
+#define AID_MOT_PWRIC     9001  /* power IC */
+#define AID_MOT_USB       9002  /* mot usb */
+#define AID_MOT_DRM       9003  /* can access DRM resource. */
+#define AID_MOT_TCMD      9004  /* mot_tcmd */
+#define AID_MOT_SEC_RTC   9005  /* mot cpcap rtc */
+#define AID_MOT_TOMBSTONE 9006
+#define AID_MOT_TPAPI     9007  /* mot_tpapi */
+#define AID_MOT_SECCLKD   9008  /* mot_secclkd */
+#define AID_MOT_WHISPER   9009  /* Whisper Protocol access */
+#define AID_MOT_CAIF      9010  /* can create CAIF sockets */
+#define AID_MOT_DLNA      9011  /* DLNA native */
+#endif // MOTOROLA_UIDS
 
 #define AID_MISC          9998  /* access to misc storage */
 #define AID_NOBODY        9999
@@ -154,11 +171,27 @@ static const struct android_id_info android_ids[] = {
     { "loop_radio", AID_LOOP_RADIO, },
     { "qcom_oncrpc", AID_QCOM_ONCRPC, },
     { "qcom_diag", AID_QCOM_DIAG, },
+#if defined(MOTOROLA_UIDS)
+    { "mot_osh",   AID_MOT_OSH, },
+    { "mot_accy",  AID_MOT_ACCY, },
+    { "mot_pwric", AID_MOT_PWRIC, },
+    { "mot_usb",   AID_MOT_USB, },
+    { "mot_drm",   AID_MOT_DRM, },
+    { "mot_tcmd",  AID_MOT_TCMD, },
+    { "mot_sec_rtc",   AID_MOT_SEC_RTC, },
+    { "mot_tombstone", AID_MOT_TOMBSTONE, },
+    { "mot_tpapi",     AID_MOT_TPAPI, },
+    { "mot_secclkd",   AID_MOT_SECCLKD, },
+    { "mot_whisper",   AID_MOT_WHISPER, },
+    { "mot_caif",  AID_MOT_CAIF, },
+    { "mot_dlna",  AID_MOT_DLNA, },
+#endif
     { "misc",      AID_MISC, },
     { "nobody",    AID_NOBODY, },
     { "clat",      AID_CLAT, },
     { "mediadrm",  AID_MEDIA_DRM, },
-    { "theme_man", AID_THEMEMAN, },
+    { "theme_man", AID_THEMEMAN },
+    { "audit",      AID_AUDIT, },
 };
 
 #define android_id_count \
@@ -192,14 +225,13 @@ static const struct fs_path_config android_dirs[] = {
     { 00775, AID_MEDIA_RW, AID_MEDIA_RW, 0, "data/media/Music" },
     { 00771, AID_SYSTEM, AID_SYSTEM, 0, "data" },
     { 00750, AID_ROOT,   AID_SHELL,  0, "sbin" },
+    { 00755, AID_ROOT,   AID_ROOT,   0, "system/addon.d" },
     { 00755, AID_ROOT,   AID_SHELL,  0, "system/bin" },
     { 00755, AID_ROOT,   AID_SHELL,  0, "system/vendor" },
     { 00755, AID_ROOT,   AID_SHELL,  0, "system/xbin" },
-    { 00755, AID_ROOT,   AID_SHELL,  0, "system/etc/init.d" },
     { 00755, AID_ROOT,   AID_ROOT,   0, "system/etc/ppp" },
     { 00755, AID_ROOT,   AID_SHELL,  0, "vendor" },
     { 00777, AID_ROOT,   AID_ROOT,   0, "sdcard" },
-    { 00771, AID_SYSTEM, AID_SYSTEM, 0, "sd-ext" },
     { 00755, AID_ROOT,   AID_ROOT,   0, 0 },
 };
 
@@ -215,11 +247,11 @@ static const struct fs_path_config android_files[] = {
     { 00440, AID_ROOT,      AID_SHELL,     0, "system/etc/init.trout.rc" },
     { 00550, AID_ROOT,      AID_SHELL,     0, "system/etc/init.ril" },
     { 00550, AID_ROOT,      AID_SHELL,     0, "system/etc/init.testmenu" },
-    { 00750, AID_ROOT,      AID_SHELL,     0, "system/etc/init.d/*" },
     { 00550, AID_DHCP,      AID_SHELL,     0, "system/etc/dhcpcd/dhcpcd-run-hooks" },
     { 00444, AID_RADIO,     AID_AUDIO,     0, "system/etc/AudioPara4.csv" },
     { 00555, AID_ROOT,      AID_ROOT,      0, "system/etc/ppp/*" },
     { 00555, AID_ROOT,      AID_ROOT,      0, "system/etc/rc.*" },
+    { 00755, AID_ROOT,      AID_ROOT,      0, "system/addon.d/*" },
     { 00644, AID_SYSTEM,    AID_SYSTEM,    0, "data/app/*" },
     { 00644, AID_MEDIA_RW,  AID_MEDIA_RW,  0, "data/media/*" },
     { 00644, AID_SYSTEM,    AID_SYSTEM,    0, "data/app-private/*" },
@@ -242,9 +274,9 @@ static const struct fs_path_config android_files[] = {
     /* the following file has enhanced capabilities and IS included in user builds. */
     { 00750, AID_ROOT,      AID_SHELL,     (1 << CAP_SETUID) | (1 << CAP_SETGID), "system/bin/run-as" },
 
-    { 06750, AID_ROOT,      AID_SYSTEM,    0, "system/bin/rebootcmd" },
     { 00755, AID_ROOT,      AID_SHELL,     0, "system/bin/*" },
     { 00755, AID_ROOT,      AID_ROOT,      0, "system/lib/valgrind/*" },
+    { 00755, AID_ROOT,      AID_ROOT,      0, "system/libexec/*" },
     { 00755, AID_ROOT,      AID_SHELL,     0, "system/xbin/*" },
     { 00755, AID_ROOT,      AID_SHELL,     0, "system/vendor/bin/*" },
     { 00755, AID_ROOT,      AID_SHELL,     0, "vendor/bin/*" },
@@ -254,6 +286,7 @@ static const struct fs_path_config android_files[] = {
     { 00750, AID_ROOT,      AID_SHELL,     0, "charger*" },
     { 00750, AID_ROOT,      AID_SHELL,     0, "sbin/fs_mgr" },
     { 00640, AID_ROOT,      AID_SHELL,     0, "fstab.*" },
+    { 00755, AID_ROOT,      AID_SHELL,     0, "system/etc/init.d/*" },
     { 00644, AID_ROOT,      AID_ROOT,      0, 0 },
 };
 
