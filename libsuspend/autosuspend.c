@@ -69,11 +69,6 @@ int autosuspend_enable(void)
         return ret;
     }
 
-    if (!autosuspend_ops) {
-        ALOGE("Error: AutoSuspend Operations are not initialized\n");
-        return -1;
-    }
-
     ALOGV("autosuspend_enable\n");
 
     if (autosuspend_enabled) {
@@ -96,11 +91,6 @@ int autosuspend_disable(void)
     ret = autosuspend_init();
     if (ret) {
         return ret;
-    }
-
-    if (!autosuspend_ops) {
-        ALOGE("Error: AutoSuspend Operations are not initialized\n");
-        return -1;
     }
 
     ALOGV("autosuspend_disable\n");

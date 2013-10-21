@@ -193,8 +193,14 @@ static int parse_flags(char *flags, struct flag_list *fl,
                 /* It's not a known flag, so it must be a filesystem specific
                  * option.  Add it to fs_options if it was passed in.
                  */
-                strlcat(fs_options, p, fs_options_len);
-                strlcat(fs_options, ",", fs_options_len);
+#ifndef HAVE_SELINUX
+                /* Drop context option from non-selinux builds */
+                if (strncmp(p,"context=",8))
+#endif
+                {
+                    strlcat(fs_options, p, fs_options_len);
+                    strlcat(fs_options, ",", fs_options_len);
+                }
             } else {
                 /* fs_options was not passed in, so if the flag is unknown
                  * it's an error.
@@ -214,16 +220,74 @@ out:
     return f;
 }
 
+/* Read a line of text till the next newline character.
+ * If no newline is found before the buffer is full, continue reading till a new line is seen,
+ * then return an empty buffer.  This effectively ignores lines that are too long.
+ * On EOF, return null.
+ */
+static char *fs_getline(char *buf, int size, FILE *file)
+{
+    int cnt = 0;
+    int eof = 0;
+    int eol = 0;
+    int c;
+
+    if (size < 1) {
+        return NULL;
+    }
+
+    while (cnt < (size - 1)) {
+        c = getc(file);
+        if (c == EOF) {
+            eof = 1;
+            break;
+        }
+
+        *(buf + cnt) = c;
+        cnt++;
+
+        if (c == '\n') {
+            eol = 1;
+            break;
+        }
+    }
+
+    /* Null terminate what we've read */
+    *(buf + cnt) = '\0';
+
+    if (eof) {
+        if (cnt) {
+            return buf;
+        } else {
+            return NULL;
+        }
+    } else if (eol) {
+        return buf;
+    } else {
+        /* The line is too long.  Read till a newline or EOF.
+         * If EOF, return null, if newline, return an empty buffer.
+         */
+        while(1) {
+            c = getc(file);
+            if (c == EOF) {
+                return NULL;
+            } else if (c == '\n') {
+                *buf = '\0';
+                return buf;
+            }
+        }
+    }
+}
+
 struct fstab *fs_mgr_read_fstab(const char *fstab_path)
 {
     FILE *fstab_file;
     int cnt, entries;
-    ssize_t len;
-    size_t alloc_len = 0;
-    char *line = NULL;
+    int len;
+    char line[256];
     const char *delim = " \t";
     char *save_ptr, *p;
-    struct fstab *fstab = NULL;
+    struct fstab *fstab;
     struct fstab_rec *recs;
     char *key_loc;
     long long part_length;
@@ -239,8 +303,9 @@ struct fstab *fs_mgr_read_fstab(const char *fstab_path)
     }
 
     entries = 0;
-    while ((len = getline(&line, &alloc_len, fstab_file)) != -1) {
+    while (fs_getline(line, sizeof(line), fstab_file)) {
         /* if the last character is a newline, shorten the string by 1 byte */
+        len = strlen(line);
         if (line[len - 1] == '\n') {
             line[len - 1] = '\0';
         }
@@ -257,7 +322,7 @@ struct fstab *fs_mgr_read_fstab(const char *fstab_path)
 
     if (!entries) {
         ERROR("No entries found in fstab\n");
-        goto err;
+        return 0;
     }
 
     /* Allocate and init the fstab structure */
@@ -269,8 +334,9 @@ struct fstab *fs_mgr_read_fstab(const char *fstab_path)
     fseek(fstab_file, 0, SEEK_SET);
 
     cnt = 0;
-    while ((len = getline(&line, &alloc_len, fstab_file)) != -1) {
+    while (fs_getline(line, sizeof(line), fstab_file)) {
         /* if the last character is a newline, shorten the string by 1 byte */
+        len = strlen(line);
         if (line[len - 1] == '\n') {
             line[len - 1] = '\0';
         }
@@ -295,25 +361,25 @@ struct fstab *fs_mgr_read_fstab(const char *fstab_path)
 
         if (!(p = strtok_r(line, delim, &save_ptr))) {
             ERROR("Error parsing mount source\n");
-            goto err;
+            return 0;
         }
         fstab->recs[cnt].blk_device = strdup(p);
 
         if (!(p = strtok_r(NULL, delim, &save_ptr))) {
             ERROR("Error parsing mount_point\n");
-            goto err;
+            return 0;
         }
         fstab->recs[cnt].mount_point = strdup(p);
 
         if (!(p = strtok_r(NULL, delim, &save_ptr))) {
             ERROR("Error parsing fs_type\n");
-            goto err;
+            return 0;
         }
         fstab->recs[cnt].fs_type = strdup(p);
 
         if (!(p = strtok_r(NULL, delim, &save_ptr))) {
             ERROR("Error parsing mount_flags\n");
-            goto err;
+            return 0;
         }
         tmp_fs_options[0] = '\0';
         fstab->recs[cnt].flags = parse_flags(p, mount_flags,
@@ -329,7 +395,7 @@ struct fstab *fs_mgr_read_fstab(const char *fstab_path)
 
         if (!(p = strtok_r(NULL, delim, &save_ptr))) {
             ERROR("Error parsing fs_mgr_options\n");
-            goto err;
+            return 0;
         }
         fstab->recs[cnt].fs_mgr_flags = parse_flags(p, fs_mgr_flags,
                                               &key_loc, &part_length,
@@ -342,15 +408,8 @@ struct fstab *fs_mgr_read_fstab(const char *fstab_path)
         cnt++;
     }
     fclose(fstab_file);
-    free(line);
-    return fstab;
 
-err:
-    fclose(fstab_file);
-    free(line);
-    if (fstab)
-        fs_mgr_free_fstab(fstab);
-    return NULL;
+    return fstab;
 }
 
 void fs_mgr_free_fstab(struct fstab *fstab)
@@ -365,6 +424,7 @@ void fs_mgr_free_fstab(struct fstab *fstab)
         free(fstab->recs[i].fs_options);
         free(fstab->recs[i].key_loc);
         free(fstab->recs[i].label);
+        i++;
     }
 
     /* Free the fstab_recs array created by calloc(3) */
